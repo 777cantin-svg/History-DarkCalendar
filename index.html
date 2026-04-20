@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日は何の日？ ヒストリーカレンダー</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0F1115;
+  --card:#1A1D24;
+  --card2:#20242E;
+  --text:#FFFFFF;
+  --sub:#B8BDC9;
+  --accent:#D4AF37;
+  --accent2:#4DA3FF;
+  --danger:#E05A5A;
+  --danger2:#FF3B3B;
+  --purple:#9D7FD6;
+  --border:rgba(212,175,55,0.15);
+  --border-red:rgba(224,90,90,0.25);
+  --radius:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Noto Sans JP',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+#splash{
+  position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity 0.6s ease;
+}
+#splash.hidden{opacity:0;pointer-events:none;}
+.splash-icon{
+  width:90px;height:90px;background:linear-gradient(135deg,#c0392b,#8B0000);border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:42px;box-shadow:0 0 60px rgba(192,57,43,0.5);animation:pulse 1.5s ease infinite;
+}
+@keyframes pulse{0%,100%{box-shadow:0 0 40px rgba(192,57,43,0.3);}50%{box-shadow:0 0 90px rgba(192,57,43,0.7);}}
+#splash h1{font-family:'Noto Serif JP',serif;font-weight:900;font-size:22px;color:var(--danger2);margin-top:20px;letter-spacing:2px;}
+#splash p{color:var(--sub);font-size:13px;margin-top:8px;}
+#app{display:none;flex-direction:column;min-height:100vh;}
+#app.visible{display:flex;}
+#bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;background:rgba(15,17,21,0.97);border-top:1px solid rgba(224,90,90,0.2);display:flex;z-index:100;backdrop-filter:blur(12px);
+}
+.nav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 0;cursor:pointer;background:none;border:none;color:var(--sub);transition:all 0.2s;font-size:10px;gap:4px;font-family:'Noto Sans JP',sans-serif;
+}
+.nav-btn span.icon{font-size:20px;}
+.nav-btn.active{color:var(--danger2);}
+.nav-btn:hover{color:var(--danger);}
+.screen{display:none;flex-direction:column;flex:1;padding-bottom:70px;}
+.screen.active{display:flex;}
+
+/* HOOK */
+.hook-banner{
+  margin:0 16px 12px;padding:14px 16px;background:linear-gradient(135deg,rgba(192,57,43,0.25),rgba(139,0,0,0.15));border:1px solid rgba(224,90,90,0.4);border-radius:12px;position:relative;overflow:hidden;cursor:pointer;
+}
+.hook-banner::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--danger2);border-radius:4px 0 0 4px;}
+.hook-eye{font-size:10px;letter-spacing:2px;color:var(--danger2);font-weight:700;text-transform:uppercase;margin-bottom:6px;}
+.hook-text{font-family:'Noto Serif JP',serif;font-size:16px;font-weight:900;color:#fff;line-height:1.4;}
+.hook-sub{font-size:12px;color:#d7dbe4;margin-top:6px;line-height:1.5;}
+.hook-pulse{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:10px;height:10px;background:var(--danger2);border-radius:50%;animation:blip 1.2s ease infinite;}
+@keyframes blip{0%,100%{opacity:1;transform:translateY(-50%) scale(1);}50%{opacity:0.4;transform:translateY(-50%) scale(1.6);}}
+
+/* HEADER */
+.app-header{padding:16px 16px 10px;background:linear-gradient(180deg,rgba(10,12,16,0.98),transparent);position:sticky;top:0;z-index:50;backdrop-filter:blur(8px);}
+.date-nav{display:flex;align-items:center;justify-content:space-between;}
+.header-date{font-size:12px;color:var(--sub);}
+.header-day-num{font-family:'Bebas Neue',cursive;font-size:38px;color:var(--text);line-height:1;}
+.header-title{font-family:'Noto Serif JP',serif;font-size:16px;color:var(--danger2);font-weight:700;margin-top:2px;}
+.nav-arrow{background:var(--card);border:1px solid var(--border-red);color:var(--danger);border-radius:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;transition:all 0.2s;}
+.nav-arrow:hover{background:rgba(224,90,90,0.15);}
+.date-center{flex:1;text-align:center;}
+
+/* TABS */
+.tabs{display:flex;gap:6px;padding:0 16px 10px;overflow-x:auto;scrollbar-width:none;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab-btn{flex-shrink:0;padding:6px 14px;border-radius:20px;border:1px solid rgba(224,90,90,0.2);background:var(--card);color:var(--sub);font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.2s;}
+.tab-btn.active{background:var(--danger);color:#fff;border-color:var(--danger);font-weight:700;}
+.tab-btn:hover:not(.active){border-color:var(--danger);color:var(--danger);}
+
+/* CARDS */
+.card-list{padding:0 16px;display:flex;flex-direction:column;gap:12px;}
+.hist-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all 0.22s;position:relative;overflow:hidden;animation:fadeUp 0.35s ease forwards;opacity:0;transform:translateY(14px);}
+@keyframes fadeUp{to{opacity:1;transform:translateY(0);}}
+.hist-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent);border-radius:3px 0 0 3px;}
+.hist-card.person::before{background:var(--accent2);}
+.hist-card.death::before{background:var(--danger2);}
+.hist-card.anniversary::before{background:var(--purple);}
+.hist-card:hover{background:var(--card2);transform:translateY(-2px);box-shadow:0 10px 36px rgba(0,0,0,0.5);}
+.hist-card:active{transform:scale(0.992);}
+
+/* SHOCK */
+.shock-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.shock-badge{font-size:10px;padding:2px 8px;border-radius:6px;font-weight:700;letter-spacing:0.5px;}
+.shock-badge.s5{background:rgba(255,59,59,0.2);color:#FF3B3B;border:1px solid rgba(255,59,59,0.3);}
+.shock-badge.s4{background:rgba(255,140,0,0.15);color:#FF8C00;border:1px solid rgba(255,140,0,0.3);}
+.shock-badge.s3{background:rgba(212,175,55,0.12);color:var(--accent);border:1px solid rgba(212,175,55,0.2);}
+.shock-badge.s2{background:rgba(184,189,201,0.08);color:var(--sub);border:1px solid rgba(184,189,201,0.15);}
+.card-year{font-family:'Bebas Neue',cursive;font-size:28px;color:var(--accent);line-height:1;}
+.hist-card.person .card-year{color:var(--accent2);}
+.hist-card.death .card-year{color:var(--danger2);}
+.hist-card.anniversary .card-year{color:var(--purple);}
+.card-label{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;margin-bottom:6px;background:rgba(212,175,55,0.12);color:var(--accent);font-weight:700;letter-spacing:1px;}
+.hist-card.person .card-label{background:rgba(77,163,255,0.12);color:var(--accent2);}
+.hist-card.death .card-label{background:rgba(255,59,59,0.12);color:var(--danger2);}
+.hist-card.anniversary .card-label{background:rgba(157,127,214,0.15);color:var(--purple);}
+.card-title{font-size:15px;font-weight:700;margin:4px 0;color:var(--text);line-height:1.4;}
+.card-desc{font-size:13px;color:var(--sub);line-height:1.6;}
+.card-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+.tag-pill{font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.05);color:var(--sub);border:1px solid rgba(255,255,255,0.08);}
+.card-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.card-btn{padding:6px 14px;border-radius:8px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.2s;border:none;}
+.card-btn.primary{background:var(--danger);color:#fff;font-weight:700;}
+.card-btn.share-btn{background:linear-gradient(135deg, rgba(29,161,242,0.22), rgba(77,163,255,0.10));color:#66B2FF;border:1px solid rgba(77,163,255,0.38);font-weight:900;box-shadow:0 0 0 1px rgba(77,163,255,0.08) inset;}
+.card-btn.fav{background:none;border:1px solid var(--border);color:var(--sub);font-size:14px;padding:6px 10px;}
+.card-btn.fav.active{color:#FFD700;border-color:#FFD700;}
+.card-btn:hover{opacity:0.8;}
+.peek-hint{text-align:center;padding:10px 6px 4px;color:rgba(255,255,255,0.42);font-size:11px;letter-spacing:0.5px;}
+
+/* SPOTLIGHT */
+.spotlight{margin:0 16px 14px;background:linear-gradient(135deg,rgba(139,0,0,0.34),rgba(26,29,36,0.92));border:1px solid rgba(224,90,90,0.3);border-radius:var(--radius);padding:20px;position:relative;overflow:hidden;cursor:pointer;box-shadow:0 8px 30px rgba(128,0,0,0.18);}
+.spotlight::after{content:'💀';position:absolute;right:14px;top:12px;font-size:28px;opacity:0.25;}
+.spotlight-label{font-size:11px;color:var(--danger2);letter-spacing:2px;font-weight:900;margin-bottom:8px;text-transform:uppercase;}
+.spotlight-year{font-family:'Bebas Neue',cursive;font-size:52px;color:var(--danger2);line-height:1;margin-bottom:4px;}
+.spotlight-title{font-size:17px;font-weight:700;margin-bottom:6px;}
+.spotlight-desc{font-size:13px;color:var(--sub);line-height:1.7;}
+
+/* STATS */
+.stats-row{display:flex;gap:8px;padding:0 16px 12px;}
+.stat-chip{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;}
+.stat-num{font-family:'Bebas Neue',cursive;font-size:22px;color:var(--danger);}
+.stat-label{font-size:10px;color:var(--sub);}
+.section-title{padding:12px 16px 8px;font-size:11px;color:var(--sub);letter-spacing:2px;font-weight:700;text-transform:uppercase;}
+
+/* CALENDAR */
+#calendar-screen{padding:16px;padding-bottom:70px;}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+.cal-month-title{font-family:'Noto Serif JP',serif;font-size:20px;font-weight:700;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.cal-day-label{text-align:center;font-size:11px;color:var(--sub);padding:6px 0;font-weight:700;}
+.cal-day-label:first-child{color:var(--danger);}
+.cal-day-label:last-child{color:var(--accent2);}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:10px;cursor:pointer;font-size:14px;transition:all 0.2s;}
+.cal-day:hover:not(.empty){background:rgba(224,90,90,0.15);}
+.cal-day.today{background:var(--danger);color:#fff;font-weight:700;}
+.cal-day.selected{background:rgba(224,90,90,0.25);border:1px solid var(--danger);color:var(--danger);}
+.cal-day.empty{pointer-events:none;}
+.today-btn{display:block;margin:16px auto 0;padding:10px 28px;background:var(--card);border:1px solid var(--border-red);color:var(--danger);border-radius:10px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;transition:all 0.2s;}
+.today-btn:hover{background:rgba(224,90,90,0.1);}
+
+/* FAV */
+#favorites-screen{padding:16px;padding-bottom:70px;}
+.fav-header{font-family:'Noto Serif JP',serif;font-size:22px;font-weight:700;margin-bottom:16px;}
+.fav-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.fav-filter{padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--sub);font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:all 0.2s;}
+.fav-filter.active{background:var(--danger);color:#fff;font-weight:700;border-color:var(--danger);}
+.empty-state{text-align:center;padding:60px 20px;color:var(--sub);}
+.empty-state .empty-icon{font-size:48px;margin-bottom:16px;}
+.empty-state h3{font-size:16px;margin-bottom:8px;color:var(--text);}
+.empty-state p{font-size:13px;line-height:1.7;}
+
+/* SETTINGS */
+#settings-screen{padding:16px;padding-bottom:70px;}
+.settings-title{font-family:'Noto Serif JP',serif;font-size:22px;font-weight:700;margin-bottom:20px;}
+.settings-section{margin-bottom:24px;}
+.settings-section-label{font-size:11px;color:var(--danger);letter-spacing:2px;font-weight:700;margin-bottom:8px;text-transform:uppercase;}
+.settings-item{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;cursor:pointer;transition:all 0.2s;}
+.settings-item:hover{background:var(--card2);}
+.settings-item-left{display:flex;flex-direction:column;gap:2px;}
+.settings-item-label{font-size:14px;font-weight:500;}
+.settings-item-sub{font-size:12px;color:var(--sub);}
+.toggle{width:48px;height:26px;background:#333;border-radius:13px;position:relative;cursor:pointer;transition:background 0.3s;flex-shrink:0;}
+.toggle.on{background:var(--danger);}
+.toggle::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left 0.3s;}
+.toggle.on::after{left:25px;}
+.settings-arrow{color:var(--sub);font-size:18px;}
+.version-text{text-align:center;color:var(--sub);font-size:12px;margin-top:16px;}
+
+/* DETAIL MODAL */
+#detail-modal{position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:200;display:none;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px);}
+#detail-modal.open{display:flex;}
+.detail-sheet{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-height:88vh;overflow-y:auto;padding:26px 20px 30px;animation:slideUp 0.3s ease;position:relative;}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.detail-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,0.08);border:none;color:var(--text);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.detail-year{font-family:'Bebas Neue',cursive;font-size:60px;color:var(--danger2);line-height:1;}
+.detail-title{font-family:'Noto Serif JP',serif;font-size:20px;font-weight:700;margin:8px 0;line-height:1.4;}
+.detail-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.detail-tag{font-size:11px;padding:3px 10px;border-radius:8px;background:rgba(224,90,90,0.12);color:var(--danger);font-weight:700;}
+.detail-body{font-size:14px;color:var(--sub);line-height:1.85;margin-bottom:20px;}
+.detail-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.detail-action-btn{flex:1;min-width:120px;padding:12px;border-radius:10px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-size:13px;font-weight:700;border:none;transition:all 0.2s;}
+.detail-action-btn.primary{background:var(--danger);color:#fff;}
+.detail-action-btn.fav-btn{background:var(--card2);color:var(--sub);border:1px solid var(--border);}
+
+/* SHARE MODAL */
+#share-modal{position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:300;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:20px;}
+#share-modal.open{display:flex;}
+#share-canvas{border-radius:12px;max-width:340px;width:100%;}
+.share-modal-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+.share-btn{padding:12px 22px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;font-family:'Noto Sans JP',sans-serif;transition:all 0.2s;}
+.share-btn.x-btn{background:#000;color:#fff;border:1px solid #444;}
+.share-btn.line-btn{background:#06C755;color:#fff;}
+.share-btn.close-btn{background:var(--card2);color:var(--sub);border:1px solid var(--border);}
+
+/* NOTIF */
+#notif-banner{position:fixed;top:16px;left:16px;right:16px;background:var(--card);border:1px solid var(--danger);border-radius:12px;padding:14px 16px;z-index:400;display:none;animation:slideDown 0.3s ease;box-shadow:0 8px 40px rgba(0,0,0,0.6);}
+@keyframes slideDown{from{transform:translateY(-70px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.notif-title{font-size:13px;font-weight:700;color:var(--danger2);margin-bottom:4px;}
+.notif-body{font-size:12px;color:var(--sub);}
+.ad-banner{margin:16px 16px 0;background:var(--card2);border:1px dashed rgba(184,189,201,0.15);border-radius:10px;padding:12px;text-align:center;color:var(--sub);font-size:11px;letter-spacing:1px;}
+
+/* POLICY */
+#policy-screen,#terms-screen,#contact-screen{padding:20px 16px 70px;}
+.policy-title{font-family:'Noto Serif JP',serif;font-size:20px;font-weight:700;margin-bottom:20px;color:var(--danger);}
+.policy-body{font-size:13px;color:var(--sub);line-height:1.9;}
+.policy-section{margin-bottom:20px;}
+.policy-h{font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.back-btn{display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--sub);cursor:pointer;font-size:14px;font-family:'Noto Sans JP',sans-serif;margin-bottom:20px;padding:0;}
+.back-btn:hover{color:var(--danger);}
+
+.nav-arrow:active,
+.tab-btn:active,
+.card-btn:active,
+.settings-item:active,
+.today-btn:active{transform:scale(0.98);opacity:0.92;}
+
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(224,90,90,0.2);border-radius:2px;}
+</style>
+</head>
+<body>
+<div id="splash">
+  <div class="splash-icon">💀</div>
+  <h1>今日は何の日？</h1>
+  <p>歴史の闇を、毎日1分で。</p>
+</div>
+
+<div id="notif-banner">
+  <div class="notif-title" id="notif-title">💀 今日は何の日？</div>
+  <div class="notif-body" id="notif-body">歴史が動いた日</div>
+</div>
+
+<div id="detail-modal" onclick="handleDetailOutside(event)">
+  <div class="detail-sheet">
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <div id="d-shock" style="margin-bottom:10px;"></div>
+    <div class="detail-year" id="d-year"></div>
+    <div class="detail-title" id="d-title"></div>
+    <div class="detail-meta" id="d-meta"></div>
+    <div class="detail-body" id="d-body"></div>
+    <div class="detail-actions">
+      <button class="detail-action-btn fav-btn" id="d-fav-btn" onclick="toggleFavFromDetail()">☆ お気に入り</button>
+      <button class="detail-action-btn primary" onclick="openShareModal()">📤 シェア画像</button>
+    </div>
+  </div>
+</div>
+
+<div id="share-modal">
+  <canvas id="share-canvas" width="680" height="380"></canvas>
+  <div class="share-modal-actions">
+    <button class="share-btn x-btn" onclick="shareToX()">𝕏 でシェア</button>
+    <button class="share-btn line-btn" onclick="shareToLine()">LINE</button>
+    <button class="share-btn close-btn" onclick="closeShareModal()">閉じる</button>
+  </div>
+  <p style="color:var(--sub);font-size:11px;">画像を長押しして保存できます</p>
+</div>
+
+<div id="app">
+  <div id="home-screen" class="screen active">
+    <div class="app-header">
+      <div class="date-nav">
+        <button class="nav-arrow" onclick="changeDate(-1)">‹</button>
+        <div class="date-center">
+          <div class="header-date" id="header-date-label"></div>
+          <div class="header-day-num" id="header-day-num"></div>
+          <div class="header-title" id="header-title">今日は何の日？</div>
+        </div>
+        <button class="nav-arrow" onclick="changeDate(1)">›</button>
+      </div>
+    </div>
+
+    <div class="hook-banner" id="hook-banner" onclick="hookTapped()">
+      <div class="hook-eye">⚠ 緊急アーカイブ</div>
+      <div class="hook-text" id="hook-text">読み込み中...</div>
+      <div class="hook-sub" id="hook-sub"></div>
+      <div class="hook-pulse"></div>
+    </div>
+
+    <div class="stats-row" id="stats-row"></div>
+    <div id="spotlight-wrap"></div>
+    <div class="tabs" id="home-tabs"></div>
+    <div class="section-title" id="section-label"></div>
+    <div class="card-list" id="card-list"></div>
+    <div class="peek-hint" id="peek-hint">▼ まだヤバい出来事があります</div>
+    <div class="ad-banner">広 告</div>
+  </div>
+
+  <div id="calendar-screen" class="screen">
+    <div class="cal-header">
+      <button class="nav-arrow" onclick="calChange(-1)">‹</button>
+      <div class="cal-month-title" id="cal-month-title"></div>
+      <button class="nav-arrow" onclick="calChange(1)">›</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <button class="today-btn" onclick="goToday()">今日に戻る</button>
+  </div>
+
+  <div id="favorites-screen" class="screen">
+    <div class="fav-header">⭐ お気に入り</div>
+    <div class="fav-filters" id="fav-filters"></div>
+    <div id="fav-list"></div>
+  </div>
+
+  <div id="settings-screen" class="screen">
+    <div class="settings-title">⚙️ 設定</div>
+    <div class="settings-section">
+      <div class="settings-section-label">通知</div>
+      <div class="settings-item" onclick="toggleNotif()">
+        <div class="settings-item-left">
+          <div class="settings-item-label">毎日通知を受け取る</div>
+          <div class="settings-item-sub">「ヤバい」歴史を毎日お届け</div>
+        </div>
+        <div class="toggle" id="notif-toggle"></div>
+      </div>
+      <div class="settings-item">
+        <div class="settings-item-left">
+          <div class="settings-item-label">通知時間</div>
+          <div class="settings-item-sub" id="notif-time-label">朝 8:00</div>
+        </div>
+        <input type="time" id="notif-time-input" value="08:00" style="background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:4px 8px;font-size:13px;font-family:'Noto Sans JP',sans-serif;" onchange="updateNotifTime(this.value)">
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-section-label">その他</div>
+      <div class="settings-item" onclick="showScreen('policy')"><div class="settings-item-label">プライバシーポリシー</div><div class="settings-arrow">›</div></div>
+      <div class="settings-item" onclick="showScreen('terms')"><div class="settings-item-label">利用規約</div><div class="settings-arrow">›</div></div>
+      <div class="settings-item" onclick="showScreen('contact')"><div class="settings-item-label">お問い合わせ</div><div class="settings-arrow">›</div></div>
+    </div>
+    <div class="version-text">Version 1.2.0</div>
+  </div>
+
+  <div id="policy-screen" class="screen">
+    <button class="back-btn" onclick="showScreen('settings')">‹ 戻る</button>
+    <div class="policy-title">プライバシーポリシー</div>
+    <div class="policy-body">
+      <div class="policy-section"><div class="policy-h">取得する情報</div>本アプリは通知設定・お気に入りデータなどを端末内にのみ保存します。個人を特定する情報は一切取得しません。</div>
+      <div class="policy-section"><div class="policy-h">広告配信について</div>Google AdMob等の広告サービスを利用する場合があります。</div>
+      <div class="policy-section"><div class="policy-h">アクセス解析</div>Firebase Analyticsを使用しアプリの利用状況を匿名で収集する場合があります。</div>
+      <div class="policy-section"><div class="policy-h">免責事項</div>掲載情報の正確性・完全性を保証するものではありません。</div>
+    </div>
+  </div>
+
+  <div id="terms-screen" class="screen">
+    <button class="back-btn" onclick="showScreen('settings')">‹ 戻る</button>
+    <div class="policy-title">利用規約</div>
+    <div class="policy-body">
+      <div class="policy-section"><div class="policy-h">サービス内容</div>本アプリは歴史・雑学情報を提供するアプリです。</div>
+      <div class="policy-section"><div class="policy-h">禁止事項</div>リバースエンジニアリング・コンテンツの無断転載・商用利用を禁止します。</div>
+      <div class="policy-section"><div class="policy-h">著作権</div>本アプリのコンテンツはすべて著作権で保護されています。</div>
+      <div class="policy-section"><div class="policy-h">免責事項</div>本アプリの利用により生じた損害について開発者は一切の責任を負いません。</div>
+    </div>
+  </div>
+
+  <div id="contact-screen" class="screen">
+    <button class="back-btn" onclick="showScreen('settings')">‹ 戻る</button>
+    <div class="policy-title">お問い合わせ</div>
+    <div class="policy-body">
+      <p style="margin-bottom:16px;">ご意見・不具合のご報告はこちらから。</p>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <input id="contact-name" placeholder="お名前（任意）" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px;font-size:14px;font-family:'Noto Sans JP',sans-serif;outline:none;">
+        <textarea id="contact-msg" placeholder="お問い合わせ内容" rows="5" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:12px;font-size:14px;font-family:'Noto Sans JP',sans-serif;outline:none;resize:vertical;"></textarea>
+        <button onclick="submitContact()" style="background:var(--danger);color:#fff;border:none;border-radius:10px;padding:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">送信する</button>
+      </div>
+    </div>
+  </div>
+
+  <nav id="bottom-nav">
+    <button class="nav-btn active" id="nav-home" onclick="switchNav('home')"><span class="icon">🏠</span>ホーム</button>
+    <button class="nav-btn" id="nav-calendar" onclick="switchNav('calendar')"><span class="icon">📅</span>カレンダー</button>
+    <button class="nav-btn" id="nav-favorites" onclick="switchNav('favorites')"><span class="icon">⭐</span>お気に入り</button>
+    <button class="nav-btn" id="nav-settings" onclick="switchNav('settings')"><span class="icon">⚙️</span>設定</button>
+  </nav>
+</div>
+
+<script>
+const EVENTS = [
+  {id:'e001',month:4,day:19,year:1775,title:'アメリカ独立戦争が始まる',short_description:'レキシントン・コンコードの戦いで植民地民兵とイギリス軍が衝突。歴史が動いた瞬間。',description:'1775年4月19日、マサチューセッツ州レキシントンとコンコードでイギリス軍と植民地民兵が激突。これがアメリカ独立戦争の最初の戦闘となり、後のアメリカ合衆国建国へとつながる歴史的転換点となった。「自由か死か」をスローガンに、歴史上最大の革命の一つが幕を開けた。',category:'戦争',country:'アメリカ',importance:5,tags:['独立戦争','戦争','革命','アメリカ'],hook:'この日、世界は引き返せなくなった',hook_text:'植民地がイギリスに銃を向けた。世界史を変えた最初の一発が放たれた。'},
+  {id:'e002',month:4,day:19,year:1995,title:'オクラホマシティ爆破テロ事件',short_description:'連邦政府ビルが爆破。168名が死亡したアメリカ史上最悪の国内テロ。',description:'1995年4月19日、アメリカ・オクラホマシティの連邦政府ビルで大規模爆弾テロが発生。子どもを含む168人が命を失い、800人以上が負傷した。犯人は元陸軍兵士のティモシー・マクベイ。国内テロとして当時史上最大の被害となった悲惨な事件。',category:'テロ・事件',country:'アメリカ',importance:5,tags:['テロ','爆破','事件','悲劇'],hook:'この日、街は一瞬で壊れた',hook_text:'子どもたちも巻き込まれた。アメリカ史上最悪の国内テロがこの日起きた。'},
+  {id:'e003',month:4,day:19,year:1529,title:'プロテスタント誕生のきっかけとなった抗議',short_description:'「プロテスタント」の語源となった帝国議会での歴史的抗議。',description:'神聖ローマ帝国のシュパイアー帝国議会において、ルター派の諸侯が皇帝の決定に抗議文を提出。この「抗議（Protest）」がプロテスタントという名称の語源となった。キリスト教の分裂と宗教改革の大きな転換点。',category:'宗教',country:'ドイツ',importance:3,tags:['宗教改革','キリスト教','歴史'],hook:'この日、信仰は二つに割れた',hook_text:'一枚の抗議文が、キリスト教を永遠に二つに割いた。'},
+  {id:'e004',month:4,day:19,year:2005,title:'ベネディクト16世がローマ教皇に就任',short_description:'ヨハネ・パウロ2世の後継として保守派教皇が選出。',description:'コンクラーベにより、ドイツ出身のヨゼフ・ラッツィンガー枢機卿が第265代ローマ教皇ベネディクト16世として選出された。後に生前退位という前例のない決断をした教皇。',category:'宗教',country:'バチカン',importance:3,tags:['カトリック','教皇','バチカン'],hook:'この日、世界が新たな象徴を得た',hook_text:'600年ぶりの生前退位をした教皇がこの日選ばれた。'},
+  {id:'e101',month:3,day:11,year:2011,title:'東日本大震災が発生',short_description:'M9.0の超巨大地震と大津波が東北を壊滅。死者・行方不明者約2万2千人。',description:'2011年3月11日14時46分、日本の太平洋沖を震源とするM9.0の地震が発生。高さ数十メートルの大津波が東北沿岸を次々と飲み込んだ。福島第一原子力発電所では炉心溶融が発生。日本観測史上最大の地震として歴史に刻まれた未曾有の大災害。',category:'自然災害',country:'日本',importance:5,tags:['地震','津波','震災','日本'],hook:'この日、日本は止まった',hook_text:'「3.11」。この日を知らない日本人はいない。'},
+  {id:'e102',month:7,day:20,year:1969,title:'アポロ11号が月面着陸',short_description:'人類初の月面着陸。全世界がテレビに釘付けになった瞬間。',description:'NASAのアポロ11号でニール・アームストロングとバズ・オルドリンが月面に着陸。アームストロングが月面に降り立った瞬間、全世界に言葉が届いた。',category:'科学',country:'アメリカ',importance:5,tags:['宇宙','月','NASA','科学'],hook:'この日、人類は地球の外へ足を置いた',hook_text:'この瞬間、全人類がテレビに釘付けになった。'},
+  {id:'e103',month:11,day:9,year:1989,title:'ベルリンの壁が崩壊',short_description:'東西を隔てた「死の壁」が崩れた夜。140人以上の命を奪った壁。',description:'東ドイツ政府が旅行制限撤廃を発表。市民が壁に殺到し、28年間ドイツを分断してきたベルリンの壁が崩壊した。壁の建設以降、越境を試みて射殺された人は140人以上。自由を求めた人々の長い戦いが終わった夜。',category:'政治',country:'ドイツ',importance:5,tags:['冷戦','自由','ドイツ','壁'],hook:'この日、分断は崩れ落ちた',hook_text:'この夜、歓喜と涙でベルリンの夜が溢れた。'}
+];
+
+const PERSONS = [
+  {id:'p007',name:'小渕恵三',birth_month:4,birth_day:19,birth_year:1937,death_month:5,death_day:14,death_year:2000,profession:'第84代内閣総理大臣',nationality:'日本',short_description:'「平成」を発表した「平成おじさん」。在職中に脳梗塞で倒れ逝去。',full_description:'平成の改元を官房長官として発表し「平成おじさん」と呼ばれた。第84代内閣総理大臣として日本の政策に取り組んだが、在職中に脳梗塞で倒れ、そのまま帰らぬ人となった。',tags:['日本','政治','平成'],birth_importance:3},
+  {id:'p008',name:'チャールズ・ダーウィン',birth_month:2,birth_day:12,birth_year:1809,death_month:4,death_day:19,death_year:1882,profession:'博物学者・進化論の父',nationality:'イギリス',short_description:'「人間も動物から進化した」と主張し宗教界を震撼させた科学者。',full_description:'ビーグル号での航海を経て自然選択説に基づく進化論を確立。「種の起源」は発売直後に売り切れた。宗教界から激しい批判を受けながらも現代生物学の礎を作った。1882年4月19日に逝去。',tags:['進化論','科学','イギリス'],death_importance:4},
+  {id:'p001',name:'マリー・キュリー',birth_month:11,birth_day:7,birth_year:1867,death_month:7,death_day:4,death_year:1934,profession:'物理学者・化学者',nationality:'ポーランド/フランス',short_description:'ノーベル賞を2回受賞。放射線研究で自らも被曝し続けた女性科学者。',full_description:'放射能の研究でノーベル物理学賞（1903年）とノーベル化学賞（1911年）を受賞した史上初の女性。長年の放射線被曝により白血病を発症、1934年に逝去。科学への献身が命を縮めた。',tags:['科学','ノーベル賞','女性'],birth_importance:5},
+  {id:'p002',name:'レオナルド・ダ・ヴィンチ',birth_month:4,birth_day:15,birth_year:1452,death_month:5,death_day:2,death_year:1519,profession:'芸術家・発明家・科学者',nationality:'イタリア',short_description:'「モナ・リザ」を描き、ヘリコプターを設計した500年先を行く天才。',full_description:'絵画・彫刻・建築・音楽・数学・解剖学など多岐にわたる分野で業績を残した「万能人」。飛行機やヘリコプターの原型となる設計図を描いたのは500年前。謎の多い人物。',tags:['芸術','発明','ルネサンス'],birth_importance:5}
+];
+
+const ANNIVERSARIES = [
+  {id:'a001',month:4,day:19,title:'地図の日（日本）',description:'1800年に伊能忠敬が蝦夷地の測量に出発した日。当時55歳。隠居後に日本地図の礎を築いた老人の偉業を記念する。',country:'日本',official_flag:false},
+  {id:'a002',month:4,day:22,title:'アースデイ（地球の日）',description:'1970年に始まった地球環境を考える国際的な記念日。現在は世界193カ国以上で活動が行われる。',country:'国際',official_flag:true}
+];
+
+const NOTIF_TEMPLATES = [
+  {title:'💀 今日は歴史崩壊クラスの日',body:'この日に何が起きたか、知ってるか？'},
+  {title:'⚠️ この日、世界は引き返せなくなった',body:'歴史の闇を1分でチェック。'},
+  {title:'🔥 この日に起きた地獄級の出来事',body:'知らなきゃ損する歴史の裏側。'},
+  {title:'💣 この日に大量の命が失われた',body:'忘れてはいけない一日がある。'},
+  {title:'🌑 この日に戦争が始まった',body:'平和の裏にある歴史を知れ。'},
+  {title:'☠️ 今日の危険アーカイブを開く',body:'教科書だけでは見えない歴史がある。'},
+  {title:'📜 今日は意外な人物の誕生日',body:'あの有名人がこの日に生まれた。'},
+  {title:'🗡️ この日に偉人が倒れた',body:'その死が世界を変えた。'},
+  {title:'🔴 今日の衝撃スコア：★★★★★',body:'最重要級の出来事がこの日に起きた。'}
+];
+
+const today = new Date();
+let currentDate = new Date();
+let currentTab = 'events';
+let favorites = JSON.parse(localStorage.getItem('hcal_favs') || '[]');
+let notifOn = JSON.parse(localStorage.getItem('hcal_notif') || 'true');
+let calDate = new Date();
+let detailItem = null;
+let favFilter = 'all';
+let hookTarget = null;
+let shareCache = null;
+
+function isSameDay(d1,d2){
+  return d1.getFullYear()===d2.getFullYear() && d1.getMonth()===d2.getMonth() && d1.getDate()===d2.getDate();
+}
+function isFav(id){ return favorites.some(f=>f.id===id); }
+function saveFavs(){ localStorage.setItem('hcal_favs', JSON.stringify(favorites)); }
+function getEventsFor(d){ return EVENTS.filter(e=>e.month===d.getMonth()+1 && e.day===d.getDate()).sort((a,b)=>b.importance-a.importance); }
+function getBirthsFor(d){ return PERSONS.filter(p=>p.birth_month===d.getMonth()+1 && p.birth_day===d.getDate()); }
+function getDeathsFor(d){ return PERSONS.filter(p=>p.death_month===d.getMonth()+1 && p.death_day===d.getDate()); }
+function getAnnivsFor(d){ return ANNIVERSARIES.filter(a=>a.month===d.getMonth()+1 && a.day===d.getDate()); }
+
+function findItem(id,type){
+  if(type==='event') return EVENTS.find(e=>e.id===id);
+  if(type==='birth' || type==='death') return PERSONS.find(p=>p.id===id);
+  if(type==='anniversary' || type==='anniv') return ANNIVERSARIES.find(a=>a.id===id);
+  return null;
+}
+
+function shockLabel(imp){
+  const stars = '★'.repeat(imp) + '☆'.repeat(5 - imp);
+  const cls = imp >= 5 ? 's5' : imp >= 4 ? 's4' : imp >= 3 ? 's3' : 's2';
+  const label = imp >= 5 ? '歴史崩壊' : imp >= 4 ? '地獄級' : imp >= 3 ? '衝撃' : '重い';
+  const col = imp >= 5 ? '#FF3B3B' : imp >= 4 ? '#FF8C00' : imp >= 3 ? '#D4AF37' : '#B8BDC9';
+
+  return `
+    <span style="font-size:12px;letter-spacing:1px;color:${col};font-weight:700">${stars}</span>
+    <span class="shock-badge ${cls}">${label}</span>
+  `;
+}
+
+function renderHook(events,deaths){
+  const top = events[0] || deaths[0];
+  const headerTitleEl = document.getElementById('header-title');
+  const peekHintEl = document.getElementById('peek-hint');
+
+  if(!top){
+    document.getElementById('hook-text').textContent = 'この日は、妙に静かだ';
+    document.getElementById('hook-sub').textContent = '何も起きていない日にも、歴史の余白がある。前後の日付を探してみよう。';
+    if(headerTitleEl) headerTitleEl.textContent = '今日は何の日？';
+    if(peekHintEl) peekHintEl.textContent = '▼ 前後の日付にもっと重い出来事があります';
+    hookTarget = null;
+    return;
+  }
+
+  const isE = events.includes(top);
+  const strongHook = isE && top.hook ? top.hook : `この日に ${top.name || top.title} が歴史に幕を下ろした`;
+  const strongSub = isE && top.hook_text ? top.hook_text : (top.short_description || 'この日、歴史は静かに動いた。');
+
+  document.getElementById('hook-text').textContent = strongHook;
+  document.getElementById('hook-sub').textContent = strongSub;
+
+  if(headerTitleEl){
+    if(isE && top.importance >= 5) headerTitleEl.textContent = '今日は歴史が壊れた日';
+    else if(isE && top.importance >= 4) headerTitleEl.textContent = '今日は歴史が揺れた日';
+    else headerTitleEl.textContent = '今日は何の日？';
+  }
+
+  if(peekHintEl){
+    if(events.length >= 2) peekHintEl.textContent = '▼ この日の闇はまだ終わらない';
+    else if(events.length === 1 && deaths.length > 0) peekHintEl.textContent = '▼ まだ見落としている命日があります';
+    else peekHintEl.textContent = '▼ まだヤバい出来事があります';
+  }
+
+  hookTarget = {id:top.id, type:isE ? 'event' : 'death'};
+}
+
+function hookTapped(){ if(hookTarget) openDetail(hookTarget.id, hookTarget.type); }
+
+function renderHome(){
+  const m = currentDate.getMonth()+1;
+  const day = currentDate.getDate();
+  document.getElementById('header-date-label').textContent = `${currentDate.getFullYear()}年${m}月`;
+  document.getElementById('header-day-num').textContent = `${m}月${day}日`;
+
+  const events = getEventsFor(currentDate);
+  const births = getBirthsFor(currentDate);
+  const deaths = getDeathsFor(currentDate);
+  const annivs = getAnnivsFor(currentDate);
+
+  renderHook(events,deaths);
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-chip"><div class="stat-num">${events.length}</div><div class="stat-label">出来事</div></div>
+    <div class="stat-chip"><div class="stat-num">${births.length}</div><div class="stat-label">誕生日</div></div>
+    <div class="stat-chip"><div class="stat-num">${deaths.length}</div><div class="stat-label">命日</div></div>
+    <div class="stat-chip"><div class="stat-num">${annivs.length}</div><div class="stat-label">記念日</div></div>
+  `;
+
+  const sw = document.getElementById('spotlight-wrap');
+  const top = events.find(e => e.importance >= 4) || events[0];
+  sw.innerHTML = top ? `
+    <div class="spotlight" onclick="openDetail('${top.id}','event')">
+      <div class="spotlight-label">TOP 1 / 今日の破局ポイント</div>
+      <div class="spotlight-year">${top.year}</div>
+      <div class="spotlight-title">${top.title}</div>
+      <div class="spotlight-desc">${top.short_description}</div>
+      <div style="margin-top:10px;">${shockLabel(top.importance)}</div>
+    </div>
+  ` : '';
+
+  document.getElementById('home-tabs').innerHTML = [
+    {key:'events',label:`出来事(${events.length})`},
+    {key:'births',label:`誕生日(${births.length})`},
+    {key:'deaths',label:`命日(${deaths.length})`},
+    {key:'annivs',label:`記念日(${annivs.length})`}
+  ].map(t=>`<button class="tab-btn${currentTab===t.key?' active':''}" onclick="switchTab('${t.key}')">${t.label}</button>`).join('');
+
+  renderCards(events,births,deaths,annivs);
+}
+
+function renderCards(events,births,deaths,annivs){
+  const cl = document.getElementById('card-list');
+  const sl = document.getElementById('section-label');
+  let items = [], type = '';
+
+  if(currentTab==='events'){ items=events; type='event'; sl.textContent='この日に起きた危険アーカイブ'; }
+  if(currentTab==='births'){ items=births; type='birth'; sl.textContent='この日に生まれた人物'; }
+  if(currentTab==='deaths'){ items=deaths; type='death'; sl.textContent='この日に歴史から去った人物'; }
+  if(currentTab==='annivs'){ items=annivs; type='anniv'; sl.textContent='この日の記念ログ'; }
+
+  if(items.length===0){
+    cl.innerHTML = `<div class="empty-state"><div class="empty-icon">💭</div><h3>この日は意外と静かだった</h3><p>歴史の空白もまた歴史。<br>前後の日付も探してみましょう。</p></div>`;
+    return;
+  }
+
+  cl.innerHTML = items.map((item,i)=>{
+    const isE = type==='event', isB=type==='birth', isD=type==='death', isA=type==='anniv';
+    const yearVal = isE ? item.year : isB ? item.birth_year : isD ? item.death_year : '';
+    const titleVal = (isE || isA) ? item.title : item.name;
+    const descVal = isE ? item.short_description : isA ? item.description : item.short_description;
+    const labelVal = isE ? item.category : isB ? `誕生日 ${item.profession}` : isD ? `命日 ${item.profession}` : (item.official_flag ? '公式記念日' : '記念日');
+    const cardClass = isB ? 'person' : isD ? 'death' : isA ? 'anniversary' : '';
+    const imp = isE ? (item.importance||3) : isB ? (item.birth_importance||3) : isD ? (item.death_importance||3) : 2;
+    const fav = isFav(item.id);
+    const tags = item.tags || [];
+
+    return `
+      <div class="hist-card ${cardClass}" style="animation-delay:${i*0.06}s" onclick="openDetail('${item.id}','${type}')">
+        <div class="shock-row">${shockLabel(imp)}</div>
+        ${yearVal ? `<div class="card-year">${yearVal}</div>` : ''}
+        <div class="card-label">${labelVal}</div>
+        <div class="card-title">${titleVal}</div>
+        <div class="card-desc">${descVal}</div>
+        ${tags.length ? `<div class="card-tags">${tags.map(t=>`<span class="tag-pill">#${t}</span>`).join('')}</div>` : ''}
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="card-btn primary" onclick="openDetail('${item.id}','${type}')">詳しく見る</button>
+          <button class="card-btn share-btn" onclick="quickShare('${item.id}','${type}')">📤 画像化</button>
+          <button class="card-btn fav${fav ? ' active' : ''}" id="fav-btn-${item.id}" onclick="toggleFav('${item.id}','${type}',this)">${fav ? '⭐' : '☆'}</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function switchTab(tab){ currentTab = tab; renderHome(); }
+function changeDate(delta){ currentDate.setDate(currentDate.getDate()+delta); renderHome(); }
+
+function renderCalendar(){
+  const y = calDate.getFullYear(), m = calDate.getMonth();
+  document.getElementById('cal-month-title').textContent = `${y}年${m+1}月`;
+  const first = new Date(y,m,1).getDay();
+  const last = new Date(y,m+1,0).getDate();
+
+  let html = ['日','月','火','水','木','金','土'].map(l=>`<div class="cal-day-label">${l}</div>`).join('');
+  for(let i=0;i<first;i++) html += `<div class="cal-day empty"></div>`;
+  for(let d=1; d<=last; d++){
+    const date = new Date(y,m,d), isToday = isSameDay(date,today), isSel = isSameDay(date,currentDate);
+    html += `<div class="cal-day${isToday?' today':''}${!isToday&&isSel?' selected':''}" onclick="selectDate(${y},${m},${d})">${d}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function calChange(delta){ calDate.setMonth(calDate.getMonth()+delta); renderCalendar(); }
+function selectDate(y,m,d){ currentDate = new Date(y,m,d); switchNav('home'); }
+function goToday(){ currentDate = new Date(); calDate = new Date(); switchNav('home'); }
+
+function renderFavorites(){
+  const fl2={all:'すべて',event:'出来事',birth:'誕生日',death:'命日',anniversary:'記念日'};
+  document.getElementById('fav-filters').innerHTML = ['all','event','birth','death','anniversary'].map(f=>
+    `<button class="fav-filter${favFilter===f?' active':''}" onclick="setFavFilter('${f}')">${fl2[f]}</button>`
+  ).join('');
+
+  const fl = document.getElementById('fav-list');
+  const favs = favFilter==='all' ? favorites : favorites.filter(f=>f.content_type===favFilter);
+
+  if(favs.length===0){
+    fl.innerHTML = `<div class="empty-state"><div class="empty-icon">⭐</div><h3>お気に入りはまだありません</h3><p>気になる出来事を保存してみましょう。<br>カードの☆ボタンから追加できます。</p></div>`;
+    return;
+  }
+
+  fl.innerHTML = `<div class="card-list" style="padding:0">` + favs.map(f=>{
+    const item = findItem(f.content_id,f.content_type);
+    if(!item) return '';
+    const titleVal = f.content_type==='event' || f.content_type==='anniversary' ? item.title : item.name;
+    const yearVal = f.content_type==='event' ? item.year : f.content_type==='birth' ? item.birth_year : f.content_type==='death' ? item.death_year : '';
+    const cardClass = f.content_type==='birth' ? 'person' : f.content_type==='death' ? 'death' : f.content_type==='anniversary' ? 'anniversary' : '';
+
+    return `
+      <div class="hist-card ${cardClass}" onclick="openDetail('${item.id}','${f.content_type}')">
+        ${yearVal ? `<div class="card-year">${yearVal}</div>` : ''}
+        <div class="card-title">${titleVal}</div>
+        <div class="card-desc">${item.short_description || item.description || ''}</div>
+        <div class="card-actions" onclick="event.stopPropagation()">
+          <button class="card-btn primary" onclick="openDetail('${item.id}','${f.content_type}')">詳細</button>
+          <button class="card-btn share-btn" onclick="quickShare('${item.id}','${f.content_type}')">📤 画像化</button>
+          <button class="card-btn fav active" onclick="removeFav('${item.id}')">⭐ 削除</button>
+        </div>
+      </div>
+    `;
+  }).join('') + `</div>`;
+}
+
+function setFavFilter(f){ favFilter = f; renderFavorites(); }
+
+function toggleFav(id,type,btn){
+  if(isFav(id)){
+    favorites = favorites.filter(f=>f.id!==id);
+    if(btn){ btn.textContent='☆'; btn.classList.remove('active'); }
+  }else{
+    favorites.push({id, content_type:type, content_id:id, saved_at:Date.now()});
+    if(btn){ btn.textContent='⭐'; btn.classList.add('active'); }
+  }
+  saveFavs();
+}
+
+function removeFav(id){ favorites = favorites.filter(f=>f.id!==id); saveFavs(); renderFavorites(); }
+
+function openDetail(id,type){
+  const item = findItem(id,type);
+  if(!item) return;
+  detailItem = {item,type};
+
+  const yearVal = type==='event' ? item.year : type==='birth' ? item.birth_year : type==='death' ? item.death_year : '';
+  const titleVal = (type==='event' || type==='anniversary' || type==='anniv') ? item.title : item.name;
+  const body = type==='event' ? item.description : (type==='anniversary' || type==='anniv') ? item.description : item.full_description;
+  const tags = item.tags || [];
+  const imp = type==='event' ? (item.importance||3) : type==='birth' ? (item.birth_importance||3) : type==='death' ? (item.death_importance||3) : 2;
+
+  document.getElementById('d-shock').innerHTML = shockLabel(imp);
+  document.getElementById('d-year').textContent = yearVal || '記念日';
+  document.getElementById('d-title').textContent = titleVal;
+  document.getElementById('d-meta').innerHTML = tags.map(t=>`<span class="detail-tag">#${t}</span>`).join('') + (item.country ? `<span class="detail-tag">🌍 ${item.country}</span>` : item.nationality ? `<span class="detail-tag">🌍 ${item.nationality}</span>` : '');
+  document.getElementById('d-body').textContent = body || '詳細情報は後日追加予定です。';
+  document.getElementById('d-fav-btn').textContent = isFav(id) ? '⭐ 保存済み' : '☆ お気に入り';
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function closeDetail(){ document.getElementById('detail-modal').classList.remove('open'); detailItem = null; }
+function handleDetailOutside(e){ if(e.target === document.getElementById('detail-modal')) closeDetail(); }
+
+function toggleFavFromDetail(){
+  if(!detailItem) return;
+  toggleFav(detailItem.item.id, detailItem.type, null);
+  document.getElementById('d-fav-btn').textContent = isFav(detailItem.item.id) ? '⭐ 保存済み' : '☆ お気に入り';
+}
+
+function quickShare(id,type){
+  const item = findItem(id,type);
+  if(!item) return;
+  shareCache = {item,type};
+  drawAndShowShare();
+}
+
+function openShareModal(){
+  if(!detailItem) return;
+  shareCache = detailItem;
+  drawAndShowShare();
+}
+
+function drawAndShowShare(){
+  const canvas = document.getElementById('share-canvas');
+  drawShareCard(canvas,shareCache);
+  document.getElementById('share-modal').classList.add('open');
+}
+
+function closeShareModal(){ document.getElementById('share-modal').classList.remove('open'); }
+
+function drawShareCard(canvas,{item,type}){
+  const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#0F1115';
+  ctx.fillRect(0,0,W,H);
+
+  const grad = ctx.createLinearGradient(0,0,W,H);
+  grad.addColorStop(0,'rgba(139,0,0,0.22)');
+  grad.addColorStop(1,'rgba(15,17,21,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+
+  ctx.fillStyle = '#E05A5A';
+  ctx.fillRect(0,0,6,H);
+
+  const yearVal = type==='event' ? item.year : type==='birth' ? item.birth_year : type==='death' ? item.death_year : '';
+  if(yearVal){
+    ctx.font = 'bold 90px Georgia,serif';
+    ctx.fillStyle = '#FF3B3B';
+    ctx.fillText(String(yearVal),32,108);
+  }
+
+  const labelVal = type==='event' ? (item.category || '歴史') : type==='birth' ? '誕生日' : type==='death' ? '命日' : '記念日';
+  ctx.font = 'bold 18px sans-serif';
+  ctx.fillStyle = 'rgba(255,90,90,0.9)';
+  ctx.fillText(labelVal,34,142);
+
+  ctx.font = 'bold 28px sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  wrapText(ctx, (type==='event' || type==='anniversary' || type==='anniv') ? item.title : item.name, 34, 192, W-68, 38);
+
+  ctx.font = '17px sans-serif';
+  ctx.fillStyle = '#B8BDC9';
+  wrapText(ctx, item.short_description || item.description || '', 34, 268, W-68, 26, 3);
+
+  const tags = ((item.tags || []).slice(0,3).map(t=>'#'+t).join(' ') + ' #今日は何の日').trim();
+  ctx.font = '14px sans-serif';
+  ctx.fillStyle = 'rgba(212,175,55,0.7)';
+  ctx.fillText(tags,34,H-28);
+
+  ctx.font = 'bold 15px sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.textAlign = 'right';
+  ctx.fillText('ヒストリーカレンダー',W-22,H-28);
+  ctx.textAlign = 'left';
+}
+
+function wrapText(ctx,text,x,y,maxW,lineH,maxLines=4){
+  if(!text) return;
+  const words = [...text];
+  let line = '', lc = 0;
+  for(let i=0;i<words.length;i++){
+    const test = line + words[i];
+    if(ctx.measureText(test).width > maxW){
+      ctx.fillText(line,x,y+lc*lineH);
+      line = words[i];
+      lc++;
+      if(lc >= maxLines){
+        ctx.fillText(line + '…', x, y + lc * lineH);
+        return;
+      }
+    } else {
+      line = test;
+    }
+  }
+  ctx.fillText(line, x, y + lc * lineH);
+}
+
+function shareToX(){
+  if(!shareCache) return;
+  const item = shareCache.item, type = shareCache.type;
+  const title = (type==='event' || type==='anniversary' || type==='anniv') ? item.title : item.name;
+  const tags = (item.tags || []).slice(0,2).map(t=>'#'+t).join(' ');
+  const body = item.short_description || item.description || '';
+  const text = encodeURIComponent(`【今日の危険アーカイブ】\n${title}\n\n${body}\n\n${tags} #今日は何の日 #歴史 #雑学`);
+  window.open(`https://twitter.com/intent/tweet?text=${text}`,'_blank');
+}
+
+function shareToLine(){
+  if(!shareCache) return;
+  const item = shareCache.item, type = shareCache.type;
+  const title = (type==='event' || type==='anniversary' || type==='anniv') ? item.title : item.name;
+  const text = encodeURIComponent(`【今日の危険アーカイブ】\n${title}\n${item.short_description || item.description || ''}\n#今日は何の日`);
+  window.open(`https://line.me/R/share?text=${text}`,'_blank');
+}
+
+function toggleNotif(){
+  notifOn = !notifOn;
+  localStorage.setItem('hcal_notif', JSON.stringify(notifOn));
+  document.getElementById('notif-toggle').className = 'toggle' + (notifOn ? ' on' : '');
+  if(notifOn) showNotif('🔔 通知をONにしました','危険アーカイブを毎日お届けします');
+}
+
+function updateNotifTime(val){
+  localStorage.setItem('hcal_notif_time', val);
+  const [h,m] = val.split(':');
+  document.getElementById('notif-time-label').textContent = `${parseInt(h) < 12 ? '朝' : '夜'} ${h}:${m}`;
+}
+
+function initSettings(){
+  document.getElementById('notif-toggle').className = 'toggle' + (notifOn ? ' on' : '');
+  const t = localStorage.getItem('hcal_notif_time') || '08:00';
+  document.getElementById('notif-time-input').value = t;
+  updateNotifTime(t);
+}
+
+function submitContact(){
+  if(!document.getElementById('contact-msg').value.trim()) return;
+  showNotif('✉️ 送信しました','お問い合わせありがとうございます');
+  document.getElementById('contact-msg').value='';
+  document.getElementById('contact-name').value='';
+}
+
+function switchNav(key){
+  ['home','calendar','favorites','settings'].forEach(k=>{
+    document.getElementById(`${k}-screen`).classList.toggle('active',k===key);
+    const btn = document.getElementById(`nav-${k}`);
+    if(btn) btn.classList.toggle('active',k===key);
+  });
+  ['policy','terms','contact'].forEach(k=>{
+    const el = document.getElementById(`${k}-screen`);
+    if(el) el.classList.remove('active');
+  });
+  if(key==='home') renderHome();
+  if(key==='calendar') renderCalendar();
+  if(key==='favorites') renderFavorites();
+  if(key==='settings') initSettings();
+}
+
+function showScreen(key){
+  ['home','calendar','favorites','settings','policy','terms','contact'].forEach(k=>{
+    const el = document.getElementById(`${k}-screen`);
+    if(el) el.classList.toggle('active',k===key);
+  });
+  ['home','calendar','favorites','settings'].forEach(k=>{
+    const btn = document.getElementById(`nav-${k}`);
+    if(btn) btn.classList.remove('active');
+  });
+}
+
+function showNotif(title,body){
+  const b = document.getElementById('notif-banner');
+  document.getElementById('notif-title').textContent = title;
+  document.getElementById('notif-body').textContent = body;
+  b.style.display = 'block';
+  setTimeout(()=>{ b.style.display = 'none'; }, 4000);
+}
+
+function fireRandomNotif(){
+  const t = NOTIF_TEMPLATES[Math.floor(Math.random()*NOTIF_TEMPLATES.length)];
+  showNotif(t.title,t.body);
+}
+
+window.onload = function(){
+  setTimeout(()=>{
+    document.getElementById('splash').classList.add('hidden');
+    document.getElementById('app').classList.add('visible');
+    renderHome();
+    if(notifOn) setTimeout(fireRandomNotif,1600);
+  },1800);
+};
+</script>
+</body>
+</html>
